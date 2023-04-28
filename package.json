@@ -1,0 +1,27 @@
+{
+  "name": "@mirahi/vendure-adyen-dropin-plugin",
+  "version": "0.0.2",
+  "description": "A Vendure plugin to integrate the Adyen payment provider to your server. This plugin only handles the flow for a drop-in integration on your storefront.",
+  "keywords": [
+    "vendure",
+    "vendure-plugin",
+    "adyen"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mirahi-io/vendure-adyen-dropin-plugin"
+  },
+  "author": {
+    "name": "Nicolas Toffolo",
+    "url": "https://www.linkedin.com/in/toffolo01/"
+  },
+  "dependencies": {
+    "graphql-tag": "^2.12.6",
+    "@vendure/core": "^1.9.5",
+    "@vendure/common": "^1.9.5",
+    "@adyen/api-library": "^13.1.2"
+  }
+}

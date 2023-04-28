@@ -1,0 +1,41 @@
+{
+  "name": "vendure-adyen-dropin-plugin",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/vendure-adyen-dropin-plugin/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/vendure-adyen-dropin-plugin/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "libs/vendure-adyen-dropin-plugin/jest.config.ts",
+        "passWithNoTests": true
+      },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "codeCoverage": true
+        }
+      }
+    },
+    "build": {
+      "executor": "@nrwl/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/vendure-adyen-dropin-plugin",
+        "tsConfig": "libs/vendure-adyen-dropin-plugin/tsconfig.lib.json",
+        "packageJson": "libs/vendure-adyen-dropin-plugin/package.json",
+        "main": "libs/vendure-adyen-dropin-plugin/src/index.ts",
+        "assets": ["libs/vendure-adyen-dropin-plugin/*.md"]
+      }
+    }
+  },
+  "tags": []
+}
