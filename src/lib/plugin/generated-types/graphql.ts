@@ -3504,18 +3504,18 @@ export type OrderAddress = {
 
 export type OrderCustomFields = {
   __typename?: 'OrderCustomFields';
-  paymentMethodCode?: Maybe<Scalars['String']>;
+  adyenPluginPaymentMethodCode?: Maybe<Scalars['String']>;
 };
 
 export type OrderFilterParameter = {
   active?: InputMaybe<BooleanOperators>;
+  adyenPluginPaymentMethodCode?: InputMaybe<StringOperators>;
   code?: InputMaybe<StringOperators>;
   createdAt?: InputMaybe<DateOperators>;
   currencyCode?: InputMaybe<StringOperators>;
   customerLastName?: InputMaybe<StringOperators>;
   id?: InputMaybe<IdOperators>;
   orderPlacedAt?: InputMaybe<DateOperators>;
-  paymentMethodCode?: InputMaybe<StringOperators>;
   shipping?: InputMaybe<NumberOperators>;
   shippingWithTax?: InputMaybe<NumberOperators>;
   state?: InputMaybe<StringOperators>;
@@ -3708,12 +3708,12 @@ export type OrderProcessState = {
 };
 
 export type OrderSortParameter = {
+  adyenPluginPaymentMethodCode?: InputMaybe<SortOrder>;
   code?: InputMaybe<SortOrder>;
   createdAt?: InputMaybe<SortOrder>;
   customerLastName?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
   orderPlacedAt?: InputMaybe<SortOrder>;
-  paymentMethodCode?: InputMaybe<SortOrder>;
   shipping?: InputMaybe<SortOrder>;
   shippingWithTax?: InputMaybe<SortOrder>;
   state?: InputMaybe<SortOrder>;

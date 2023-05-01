@@ -14,6 +14,7 @@ import {
   RequestContext,
   OrderLine,
   OrderState,
+  CustomOrderFields,
 } from "@vendure/core";
 import { Client, CheckoutAPI } from "@adyen/api-library";
 import { ADYEN_PLUGIN_INIT_OPTIONS, EventCode } from "./constant";
@@ -96,10 +97,13 @@ export class AdyenService {
       loggerCtx
     );
     // #endregion
-
+    /* Storing this to create a payment later */
+    const adyenPluginPaymentMethodCode =
+      paymentMethodCode as CustomOrderFields["adyenPluginPaymentMethodCode"];
     await this.orderService.updateCustomFields(ctx, order.id, {
-      paymentMethodCode,
-    }); /* Storing this to create a payment later */
+      adyenPluginPaymentMethodCode,
+    });
+    /* Adding some relevant information from context to the order object */
     await this.entityHydrator.hydrate(ctx, order, {
       relations: ["customer", "surcharges", "lines.productVariant", "shippingLines.shippingMethod"],
     });
@@ -228,14 +232,14 @@ export class AdyenService {
     order: Order,
     notificationRequestItem: NotificationRequestItem
   ): Promise<Order> {
-    if (!order.customFields.paymentMethodCode) {
-      throw Error(`Order ${order.code} doesn't have a 'paymentMethodCode'`);
+    if (!order.customFields.adyenPluginPaymentMethodCode) {
+      throw Error(`Order ${order.code} doesn't have an 'adyenPluginPaymentMethodCode'`);
     }
 
     await this.transitionOrderState(ctx, order, "ArrangingPayment");
 
     const addPaymentToOrderResult = await this.orderService.addPaymentToOrder(ctx, order.id, {
-      method: order.customFields.paymentMethodCode,
+      method: order.customFields.adyenPluginPaymentMethodCode,
       metadata: notificationRequestItem,
     });
     if (!(addPaymentToOrderResult instanceof Order)) {

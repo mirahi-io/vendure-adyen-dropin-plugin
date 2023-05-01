@@ -22,11 +22,11 @@ import type { CustomOrderFields } from "@vendure/core";
   configuration: (config) => {
     config.paymentOptions.paymentMethodHandlers.push(adyenPaymentHandler);
     config.customFields.Order.push({
-      name: "paymentMethodCode",
+      name: "adyenPluginPaymentMethodCode",
       type: "string",
       label: [
-        { languageCode: LanguageCode.en, value: "Payment Method" },
-        { languageCode: LanguageCode.fr, value: "Méthode de paiement" },
+        { languageCode: LanguageCode.en, value: "Payment Method Code" },
+        { languageCode: LanguageCode.fr, value: "Code de la méthode de paiement" },
       ],
       nullable: true,
       readonly: true,
@@ -38,32 +38,32 @@ export class AdyenPlugin {
   static options: AdyenPluginOptions;
   /**
    * @description
-   * Initialize the Adyen payment plugin
-   * @param vendureHost is needed to pass to Adyen for the webhook
+   * Initialize the Adyen payment plugin.
+   * @param environment Either 'LIVE' or 'TEST' (default: 'TEST')
+   * @param basicAuthCredendials.username (Optional) Username for Basic Auth of the Adyen webhook
+   * @param basicAuthCredendials.password (Optional) Password for Basic Auth of the Adyen webhook
+   * @param hmacKey (Optional) HMAC key for validating the webhook signature
    */
-  static init(options: AdyenPluginOptions) {
-    this.options = options;
+  static init(options?: AdyenPluginOptions) {
+    this.options = options || {};
     return AdyenPlugin;
   }
 }
 
 export type AdyenPluginOptions = {
-  /**
-   * The host of your Vendure server, e.g. `'https://my-vendure.io'`.
-   * This is used by Adyen to send webhook events to the Vendure server
-   */
-  vendureHost: string;
+  /** Either 'LIVE' or 'TEST' (default: 'TEST') */
   environment?: "LIVE" | "TEST";
   /** (Optional) Credentials for Basic Auth of the Adyen webhook. */
   basicAuthCredendials?: {
     username: string;
     password: string;
   };
+  /** (Optional) HMAC key for validating the webhook signature. */
   hmacKey?: string;
 };
 
 declare module "@vendure/core" {
   interface CustomOrderFields {
-    paymentMethodCode?: string;
+    adyenPluginPaymentMethodCode?: string;
   }
 }

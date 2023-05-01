@@ -30,19 +30,18 @@ export class AdyenController {
     @Body() body: WebhookBody
   ): Promise<string | void> {
     const notificationRequestItem = body?.notificationItems[0].NotificationRequestItem;
-    // #region Basic Auth & HMAC verification
-    try {
-      const { basicAuthCredendials, hmacKey } = this.options;
-      if (basicAuthCredendials && !this.isBasicAuthed(basicAuthHeader)) {
-        return;
-      }
-      if (hmacKey && this.hmacIsValid(notificationRequestItem, hmacKey) === false) {
-        return;
-      }
-    } catch (error: any) {
-      Logger.error(`Webhook authentication caused an error!`, loggerCtx, error?.message);
+    const { basicAuthCredendials, hmacKey, environment } = this.options;
+
+    if (environment === "LIVE" && !hmacKey) {
+      Logger.error(
+        `HMAC key is required for LIVE environment for security reasons. Ignoring webhook.`,
+        loggerCtx
+      );
+      return;
     }
-    // #endregion
+
+    if (basicAuthCredendials && !this.isBasicAuthed(basicAuthHeader)) return;
+    if (hmacKey && this.hmacIsValid(notificationRequestItem, hmacKey) === false) return;
 
     try {
       await this.adyenService.handleAdyenStatusUpdate(notificationRequestItem);
@@ -77,11 +76,16 @@ export class AdyenController {
   }
 
   private hmacIsValid(notificationRequestItem: NotificationRequestItem, hmac: string) {
-    const isValid = this.hmacValidator.validateHMAC(notificationRequestItem, hmac);
-    isValid
-      ? Logger.info("HMAC signature: OK", loggerCtx)
-      : Logger.warn("HMAC signature is invalid!", loggerCtx);
-    return isValid;
+    try {
+      const isValid = this.hmacValidator.validateHMAC(notificationRequestItem, hmac);
+      isValid
+        ? Logger.info("HMAC signature: OK", loggerCtx)
+        : Logger.warn("HMAC signature is invalid!", loggerCtx);
+      return isValid;
+    } catch (error: any) {
+      Logger.error(`Webhook HMAC validation caused an error!`, loggerCtx, error?.message);
+      return false;
+    }
     // HmacValidator doc: https://docs.adyen.com/development-resources/webhooks/verify-hmac-signatures?utm_source=ca_test&tab=codeBlockhmac_validation_kRbv3_JS_4
   }
 }
