@@ -10,7 +10,7 @@ import type {
 } from "@adyen/api-library/lib/src/typings/notification/models";
 import type { AdyenPluginOptions } from "./adyen.plugin";
 
-const loggerCtx = "AdyenWebhook";
+const loggerCtx = "AdyenController";
 
 @Controller("webhooks")
 export class AdyenController {
@@ -29,7 +29,13 @@ export class AdyenController {
     @Headers("authorization") basicAuthHeader: unknown,
     @Body() body: WebhookBody
   ): Promise<string | void> {
-    const notificationRequestItem = body?.notificationItems[0].NotificationRequestItem;
+    const notificationRequestItem = body?.notificationItems?.[0]?.NotificationRequestItem as
+      | NotificationRequestItem
+      | undefined;
+    if (!notificationRequestItem) {
+      Logger.warn(`No body was found in request`, loggerCtx);
+      return;
+    }
     const { basicAuthCredendials, hmacKey, environment } = this.options;
 
     if (environment === "LIVE" && !hmacKey) {
@@ -46,7 +52,7 @@ export class AdyenController {
     try {
       await this.adyenService.handleAdyenStatusUpdate(notificationRequestItem);
     } catch (error: any) {
-      Logger.error(`Payment was unsuccessful.`, loggerCtx, error?.message);
+      Logger.error(`Status update was unsuccessful.`, loggerCtx, error?.message);
       return "[accepted]";
     }
     return "[accepted]";

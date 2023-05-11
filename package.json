@@ -1,6 +1,6 @@
 {
   "name": "@mirahi/vendure-adyen-dropin-plugin",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A Vendure plugin to integrate the Adyen payment provider to your server. This plugin only handles the flow for a drop-in integration on your storefront.",
   "keywords": [
     "vendure",

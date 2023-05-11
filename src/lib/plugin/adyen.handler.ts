@@ -10,10 +10,11 @@ import type {
 import type { NotificationRequestItem } from "@adyen/api-library/lib/src/typings/notification/notificationRequestItem";
 
 export type PaymentMethodHandlerArgs = {
-  apiKey: any;
-  redirectUrl: any;
+  apiKey?: any;
+  redirectUrl?: any;
 };
 const loggerCtx = "AdyenHandler";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let adyenService: AdyenService;
 export const adyenPaymentHandler = new PaymentMethodHandler<PaymentMethodHandlerArgs>({
   code: "payment-adyen",
@@ -72,7 +73,7 @@ export const adyenPaymentHandler = new PaymentMethodHandler<PaymentMethodHandler
     }
     if (metadata.eventCode !== EventCode.Authorisation && metadata.success !== Success.True) {
       throw Error(
-        `Cannot create payment for eventCode ${metadata.eventCode} for order ${order.code}. Only successful payments are allowed`
+        `Cannot create payment for eventCode ${metadata.eventCode} for order ${order.code} because "${metadata?.reason}"`
       );
     }
     if (!metadata.amount.value) {
@@ -90,24 +91,16 @@ export const adyenPaymentHandler = new PaymentMethodHandler<PaymentMethodHandler
     };
   },
 
-  /** This is called when the `settlePayment` mutation is executed */
+  /** This is called when the `settlePayment` mutation or the `orderService.settlePayment` method are executed */
   settlePayment: async (
     ctx,
     order,
     payment,
     args
   ): Promise<SettlePaymentResult | SettlePaymentErrorResult> => {
-    try {
-      // checkout.captures("PSP_REFERENCE", {
-      //   amount: { currency: "EUR", value: payment.amount },
-      //   merchantAccount: "MirahiECOM",
-      // });
-      return { success: true };
-    } catch (err) {
-      return {
-        success: false,
-        errorMessage: (err as any).message,
-      };
+    if (ctx.apiType !== "admin") {
+      throw Error(`SettlePayment is not allowed for apiType '${ctx.apiType}'`);
     }
+    return { success: true };
   },
 });

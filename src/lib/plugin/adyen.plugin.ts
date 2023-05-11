@@ -35,7 +35,7 @@ import type { CustomOrderFields } from "@vendure/core";
   },
 })
 export class AdyenPlugin {
-  static options: AdyenPluginOptions;
+  static options: AdyenPluginOptions = {};
   /**
    * @description
    * Initialize the Adyen payment plugin.
@@ -43,9 +43,12 @@ export class AdyenPlugin {
    * @param basicAuthCredendials.username (Optional) Username for Basic Auth of the Adyen webhook
    * @param basicAuthCredendials.password (Optional) Password for Basic Auth of the Adyen webhook
    * @param hmacKey (Optional) HMAC key for validating the webhook signature
+   * @param paymentMethodCode (Optional) The unique code you use for this payment method (default: "payment-adyen")
    */
   static init(options?: AdyenPluginOptions) {
-    this.options = options || {};
+    if (options) {
+      this.options = options;
+    }
     return AdyenPlugin;
   }
 }
@@ -60,6 +63,7 @@ export type AdyenPluginOptions = {
   };
   /** (Optional) HMAC key for validating the webhook signature. */
   hmacKey?: string;
+  paymentMethodCode?: string;
 };
 
 declare module "@vendure/core" {

@@ -18,27 +18,13 @@ import {
 } from "@vendure/core";
 import { Client, CheckoutAPI } from "@adyen/api-library";
 import { ADYEN_PLUGIN_INIT_OPTIONS, EventCode } from "./constant";
-import { ErrorCode } from "./generated-types/graphql";
-import type {
-  AdyenPaymentIntentResult,
-  AdyenPaymentIntentError,
-  AdyenPaymentIntentInput,
-} from "./generated-types/graphql";
+import type { AdyenPaymentIntentResult } from "./generated-types/graphql";
 import type { AdyenPluginOptions } from "./adyen.plugin";
 import type { PaymentMethodHandlerArgs } from "./adyen.handler";
 import type { NotificationRequestItem } from "@adyen/api-library/lib/src/typings/notification/models";
 import type { Address as AdyenAddress } from "@adyen/api-library/lib/src/typings/checkout/address";
 import type { OrderAddress } from "@vendure/common/lib/generated-types";
 
-class PaymentIntentError implements AdyenPaymentIntentError {
-  errorCode = ErrorCode.PaymentOrderMismatchError;
-  constructor(public message: string) {}
-}
-
-class InvalidInputError implements AdyenPaymentIntentError {
-  errorCode = ErrorCode.PaymentMethodMissingError;
-  constructor(public message: string) {}
-}
 const loggerCtx = "AdyenService";
 @Injectable()
 export class AdyenService {
@@ -55,17 +41,15 @@ export class AdyenService {
     Logger.verbose("Service instantiated", loggerCtx);
   }
 
-  async createPaymentIntent(
-    ctx: RequestContext,
-    { paymentMethodCode }: AdyenPaymentIntentInput
-  ): Promise<AdyenPaymentIntentResult> {
+  async createPaymentIntent(ctx: RequestContext): Promise<AdyenPaymentIntentResult> {
+    const paymentMethodCode = this.options?.paymentMethodCode ?? "payment-adyen";
     const [order, paymentMethod] = await Promise.all([
       this.activeOrderService.getActiveOrder(ctx, undefined),
       this.getPaymentMethod(ctx, paymentMethodCode),
     ]);
     if (!paymentMethod) {
       Logger.debug(`No paymentMethod found!`, loggerCtx);
-      return new PaymentIntentError(`No paymentMethod found!`);
+      return { message: `No paymentMethod found!` };
     }
     /* Getting arguments from payment method (set in Admin UI) and options (set in `vendure-config.ts`) */
     const apiKey = this.getPaymentMethodArg(paymentMethod, "apiKey");
@@ -75,20 +59,20 @@ export class AdyenService {
     // #region Error handling & Logging
     if (!order || !order.code || !order.active) {
       Logger.debug("No active order for this session!", loggerCtx);
-      return new PaymentIntentError("No active order for this session!");
+      return { message: "No active order for this session!" };
     }
     if (!order.total || order.total <= 0) {
       Logger.debug("The total for the order caused an error!", loggerCtx);
-      return new PaymentIntentError("The total for the order caused an error!");
+      return { message: "The total for the order caused an error!" };
     }
     if (!apiKey || !redirectUrl) {
       Logger.warn(
         `CreatePaymentIntent failed, because no apiKey or redirect is configured for ${paymentMethod.code}`,
         loggerCtx
       );
-      return new PaymentIntentError(
-        `Paymentmethod ${paymentMethod.code} has no apiKey or redirectUrl configured`
-      );
+      return {
+        message: `Paymentmethod ${paymentMethod.code} has no apiKey or redirectUrl configured`,
+      };
     }
     Logger.info(
       `Payment intent is valid for order ${order.code} (${order.total / 100} ${
@@ -109,13 +93,17 @@ export class AdyenService {
     });
     if (!order.customer) {
       Logger.debug("The order doesn't have a customer!", loggerCtx);
-      return new PaymentIntentError("The order doesn't have a customer!");
+      return { message: "The order doesn't have a customer!" };
     }
     const { firstName, lastName, emailAddress, phoneNumber } = order.customer;
     if (!firstName || !lastName || !emailAddress) {
-      return new InvalidInputError(
-        `Some required customer data is missing. firstName: ${firstName}, lastName: ${lastName}, email: ${emailAddress}`
+      Logger.debug(
+        `Some required customer data is missing. firstName: ${firstName}, lastName: ${lastName}, email: ${emailAddress}`,
+        loggerCtx
       );
+      return {
+        message: `Some required customer data is missing. firstName: ${firstName}, lastName: ${lastName}, email: ${emailAddress}`,
+      };
     }
     /** !! Minimum length: 3 characters !! Your reference to uniquely identify this shopper, for example user ID or account ID. */
     const shopperReference = ctx.session?.user?.id
@@ -128,10 +116,11 @@ export class AdyenService {
     /* Getting session */
     const checkoutSession = await checkout
       .sessions({
-        // Your channel token on Vendure should match your merchantAccount name on Adyen (or the other way around)
+        // The channel token on Vendure needs to match the merchantAccount name on Adyen (or the other way around)
         merchantAccount: ctx.channel.token,
         amount: { currency: order.currencyCode, value: order.total },
-        reference: order.code /* The reference to uniquely identify a payment. */,
+        reference:
+          order.code /* The value you pass here will be later called `merchantReference`. This must be unique. */,
         returnUrl: `${redirectUrl}?orderCode=${order.code}`,
         lineItems: this.toAdyenOrderLines(order?.lines),
         shopperEmail: emailAddress,
@@ -149,12 +138,15 @@ export class AdyenService {
         // shopperIP: "123.12.23.34" /* (Opt.) Recommended for risk checks */,
       })
       .catch((err) => {
-        Logger.error(`Failed to create Adyen session!`, loggerCtx, err);
-        return undefined;
+        Logger.error(`Failed to create Adyen session!`, loggerCtx, err?.message);
+        return { error: err?.message as string };
       });
 
-    if (checkoutSession?.sessionData) Logger.info(`Sending sessionData to client.`, loggerCtx);
-    else Logger.warn(`No sessionData to send to the client!`, loggerCtx);
+    if (!("error" in checkoutSession)) Logger.info(`Sending sessionData to client.`, loggerCtx);
+    else {
+      Logger.warn(`No sessionData to send to the client!`, loggerCtx);
+      return { message: "The total for the order caused an error!" };
+    }
 
     return {
       sessionData: checkoutSession?.sessionData,
@@ -177,51 +169,38 @@ export class AdyenService {
     const order = await this.orderService.findOneByCode(ctx, orderCode);
 
     if (!order) {
-      Logger.warn(`No Vendure order matches Adyen's 'merchantReference' ${orderCode}`);
+      Logger.warn(`No Vendure order matches Adyen's 'merchantReference' ${orderCode}`, loggerCtx);
       return;
     }
     Logger.info(
-      `Received status update for channel ${merchantAccountCode} for order: ${orderCode} (Adyen code), ${order?.code} (Vendure code)`,
+      `Received status update for channel ${merchantAccountCode} for order ${order?.code} (Vendure code)`,
       loggerCtx
     );
-    /** This `switch` statement is where you can handle all situations based on the provided `eventCode` */
+    /** This `switch` statement is where you can handle all situations based on the provided `eventCode`
+     *  With a simple architecture using only card payments, e.g., you only receive `Authorisation` webhooks.
+     */
+    Logger.debug(`Webhook eventCode is ${eventCode} and success is ${success}`, loggerCtx);
     switch (eventCode) {
       case EventCode.Authorisation: {
-        Logger.debug(`Webhook eventCode is ${eventCode} and success is ${success}`, loggerCtx);
         await this.addPayment(ctx, order, notificationRequestItem);
         return;
       }
       /* Examples */
-      // case EventCode.AuthorisationAdjustment: {return}
-      // case EventCode.Capture: {return}
-      // ...
+      /* By default, capture happens automatically, so this eventCode won't be sent a lot.
+       * https://docs.adyen.com/online-payments/classic-integrations/modify-payments/capture#automatic-capture
+       * */
+      // case EventCode.Capture: {
+      //   await this.settleExistingPayment(ctx, order, notificationRequestItem.pspReference);
+      //   return;
+      // }
+      // case EventCode.AuthorisationAdjustment: { return }
+      /* ... */
     }
 
     // No other status is handled
     throw Error(
-      `Unhandled incoming Adyen eventCode '${eventCode}' for order ${order.code}; pspReference ${notificationRequestItem}; success=${success}`
+      `Unhandled incoming Adyen eventCode '${eventCode}' for order ${order.code}; pspReference ${notificationRequestItem.pspReference}; success=${success}`
     );
-  }
-
-  async settleExistingPayment(
-    ctx: RequestContext,
-    order: Order,
-    transactionId: string
-  ): Promise<void> {
-    const payment = order.payments.find((p) => p.transactionId === transactionId);
-    if (!payment) {
-      throw Error(
-        `Cannot find payment ${transactionId} for ${order.code}. Unable to settle this payment`
-      );
-    }
-    const result = await this.orderService.settlePayment(ctx, payment.id);
-    if ((result as ErrorResult).message) {
-      throw Error(
-        `Error settling payment ${payment.id} for order ${order.code}: ${
-          (result as ErrorResult).errorCode
-        } - ${(result as ErrorResult).message}`
-      );
-    }
   }
 
   /**
@@ -231,23 +210,59 @@ export class AdyenService {
     ctx: RequestContext,
     order: Order,
     notificationRequestItem: NotificationRequestItem
-  ): Promise<Order> {
+  ) {
     if (!order.customFields.adyenPluginPaymentMethodCode) {
       throw Error(`Order ${order.code} doesn't have an 'adyenPluginPaymentMethodCode'`);
+    }
+    if (order.state !== "AddingItems" && order.state !== "ArrangingPayment") {
+      Logger.info(`Order ${order.code} has status "${order.state}". Skipping...`, loggerCtx);
+      return;
     }
 
     await this.transitionOrderState(ctx, order, "ArrangingPayment");
 
-    const addPaymentToOrderResult = await this.orderService.addPaymentToOrder(ctx, order.id, {
+    const updatedOrder = await this.orderService.addPaymentToOrder(ctx, order.id, {
       method: order.customFields.adyenPluginPaymentMethodCode,
       metadata: notificationRequestItem,
     });
-    if (!(addPaymentToOrderResult instanceof Order)) {
+
+    if (!(updatedOrder instanceof Order)) {
+      throw Error(`Error when processing payment for order ${order.code}: ${updatedOrder.message}`);
+    }
+
+    const paymentMethodCode = this.options?.paymentMethodCode ?? "payment-adyen";
+    const paymentMethod = await this.getPaymentMethod(ctx, paymentMethodCode);
+    if (!paymentMethod) {
+      Logger.verbose(`No paymentMethod found!`, loggerCtx);
+      return;
+    }
+
+    if (updatedOrder.state === "PaymentAuthorized") {
+      this.settleExistingPayment(ctx, updatedOrder, notificationRequestItem.pspReference);
+    }
+  }
+
+  async settleExistingPayment(
+    ctx: RequestContext,
+    order: Order,
+    pspReference: string
+  ): Promise<void> {
+    const payment = order.payments?.find((p) => p.transactionId === pspReference);
+    if (!payment) {
       throw Error(
-        `Error adding payment to order ${order.code}: ${addPaymentToOrderResult.message}`
+        `Cannot find payment with transactionId ${pspReference} for ${order.code}. Unable to settle this payment!`
       );
     }
-    return addPaymentToOrderResult;
+    const settlePaymentResult = await this.orderService.settlePayment(ctx, payment.id);
+
+    if ((settlePaymentResult as ErrorResult).message) {
+      throw Error(
+        `Error settling payment ${payment.id} for order ${order.code}: ${
+          (settlePaymentResult as ErrorResult).errorCode
+        } - ${(settlePaymentResult as ErrorResult).message}`
+      );
+    }
+    Logger.info(`Settled payment with transactionId ${pspReference} for ${order.code}.`, loggerCtx);
   }
 
   private trimEnd(str: string | undefined, unwantedEnding: string) {
@@ -268,9 +283,9 @@ export class AdyenService {
         );
       }
       return transitionToStateResult;
+    } else {
+      Logger.debug(`Order ${order.code} is already in state '${newState}'. Skipping...`, loggerCtx);
     }
-    Logger.info(`Order ${order.code} is already in state '${newState}'`, loggerCtx);
-    return order;
   }
 
   private toAdyenOrderLines(orderLines: OrderLine[] | undefined) {
@@ -287,7 +302,7 @@ export class AdyenService {
 
     const trim = (str: string | undefined) => (str && str.length > 3000 ? str.slice(0, 2999) : str);
     return {
-      /* (Opt.) All address fields are strings with max length 3000. */
+      /* All address fields are strings with max length 3000. */
       country: countryCode /* The two-character ISO-3166-1 alpha-2 country code. */,
       city: trim(city) as string,
       street: trim(streetLine1) as string,

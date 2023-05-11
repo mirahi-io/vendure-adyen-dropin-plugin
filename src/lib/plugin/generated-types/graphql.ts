@@ -157,21 +157,12 @@ export type AdyenPaymentIntent = {
   transactionId?: Maybe<Scalars['String']>;
 };
 
-export type AdyenPaymentIntentError = ErrorResult & {
+export type AdyenPaymentIntentError = {
   __typename?: 'AdyenPaymentIntentError';
-  errorCode: ErrorCode;
   message: Scalars['String'];
 };
 
-export type AdyenPaymentIntentInput = {
-  paymentMethodCode: Scalars['String'];
-};
-
 export type AdyenPaymentIntentResult = AdyenPaymentIntent | AdyenPaymentIntentError;
-
-export type AdyenPaymentMethodsInput = {
-  paymentMethodCode: Scalars['String'];
-};
 
 export type Allocation = Node & StockMovement & {
   __typename?: 'Allocation';
@@ -2801,11 +2792,6 @@ export type MutationCreateAdministratorArgs = {
 };
 
 
-export type MutationCreateAdyenPaymentIntentArgs = {
-  input: AdyenPaymentIntentInput;
-};
-
-
 export type MutationCreateAssetsArgs = {
   input: Array<CreateAssetInput>;
 };
@@ -3646,6 +3632,7 @@ export type OrderLineCustomFieldsInput = {
   comment?: InputMaybe<Scalars['String']>;
   names?: InputMaybe<Scalars['String']>;
   supplementExtraCost?: InputMaybe<Scalars['Int']>;
+  supplementIds?: InputMaybe<Array<InputMaybe<Scalars['String']>>>;
   supplements?: InputMaybe<Array<InputMaybe<Scalars['String']>>>;
 };
 
