@@ -13,9 +13,9 @@ import {
   PaymentMethodService,
   RequestContext,
   OrderLine,
-  OrderState,
   CustomOrderFields,
 } from "@vendure/core";
+import type { OrderState } from "@vendure/core";
 import { Client, CheckoutAPI } from "@adyen/api-library";
 import { ADYEN_PLUGIN_INIT_OPTIONS, EventCode } from "./constant";
 import type { AdyenPaymentIntentResult } from "./generated-types/graphql";
